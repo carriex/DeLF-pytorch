@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser('delf')
 
 # Common options.
 parser.add_argument('--gpu_id', 
-                    default='4', 
+                    default='0',
                     type=str, 
                     help='id(s) for CUDA_VISIBLE_DEVICES')
 parser.add_argument('--manualSeed', 
@@ -38,16 +38,20 @@ parser.add_argument('--stage',
                     type=str, 
                     help='target stage: finetune | keypoint')
 parser.add_argument('--train_path_for_pretraining', 
-                    default='../../data/landmarks/landmarks_full_train', 
+                    # default='../../data/landmarks/landmarks_full_train',
+                    default='/home/ec2-user/dl-proj/google-landmark/index/0/',
                     type=str)
 parser.add_argument('--val_path_for_pretraining', 
-                    default='../../data/landmarks/landmarks_full_val', 
+                    # default='../../data/landmarks/landmarks_full_val',
+                    default='/home/ec2-user/dl-proj/google-landmark/index/0/',
                     type=str)
 parser.add_argument('--train_path_for_finetuning', 
-                    default='../../data/landmarks/landmarks_clean_train', 
+                    # default='../../data/landmarks/landmarks_clean_train',
+                    default='/home/ec2-user/dl-proj/google-landmark/index/0/',
                     type=str)
 parser.add_argument('--val_path_for_finetuning', 
-                    default='../../data/landmarks/landmarks_clean_val', 
+                    # default='../../data/landmarks/landmarks_clean_val',
+                    default='/home/ec2-user/dl-proj/google-landmark/index/0/',
                     type=str)
 parser.add_argument('--workers', 
                     default=20, 

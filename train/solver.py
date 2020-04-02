@@ -157,10 +157,10 @@ class Solver(object):
                 __to_tensor__(labels),
                 top_k=(1,3,5))
             batch_size = inputs.size(0)
-            prec_losses.update(__to_tensor__(loss)[0], batch_size)
-            prec_top1.update(prec_1[0], batch_size)
-            prec_top3.update(prec_3[0], batch_size)
-            prec_top5.update(prec_5[0], batch_size)
+            prec_losses.update(loss.item(), batch_size)
+            prec_top1.update(prec_1, batch_size)
+            prec_top3.update(prec_3, batch_size)
+            prec_top5.update(prec_5, batch_size)
             
             # measure elapsed time
             batch_timer.update(time.time() - since)

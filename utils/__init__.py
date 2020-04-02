@@ -4,7 +4,7 @@ useful utils.
 """
 from .misc import *
 from .logger import *
-from .confusionmeter import *
+# from .confusionmeter import *
 
 # progress bar
 import os, sys

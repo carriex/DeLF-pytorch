@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.nn.init as init
 from torch.autograd import Variable
 
-__all__ = ['get_mean_and_std', 'init_params', 'mkdir_p', 'AverageMeter', 'compute_precision_top_k']
+# __all__ = ['get_mean_and_std', 'init_params', 'mkdir_p', 'AverageMeter', 'compute_precision_top_k']
 
 def compute_precision_top_k(output, target, top_k=(1,)):
     """Computes the precision@k for the specified values of k"""
