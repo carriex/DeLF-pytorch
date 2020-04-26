@@ -33,7 +33,8 @@ optional arguments:
 ## Clean the data 
 
 Google Landmark Dataset v2 is a large dataset with 4,132,914 images in the train set and 203,095 landmarks. Use the below script to clean the data following the similar procedures described in this [report](https://arxiv.org/pdf/1906.11874.pdf).
-The cleaned version is stored in a csv file (img_id, landmark_id).
+The cleaned version is stored in a csv file in the format of (img_id, landmark_id).
+This script also extracts and saves the ResNet 50 features of the images.
 
 
 ```bash
