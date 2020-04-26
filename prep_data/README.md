@@ -1,5 +1,11 @@
 # Data preparation 
 
+## Install required modules 
+
+```bash
+$ pip install -r requirements.txt
+```
+
 ## Download the data 
 Use the download scripts provided in the official [github repo](https://github.com/cvdfoundation/google-landmark) to download the data and csv files.
 
