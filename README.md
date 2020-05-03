@@ -20,29 +20,19 @@ After the train process is done, model will be saved at `repo/<expr>/keypoint/ck
 $ cd train/
 $ python main.py \
     --stage 'finetune' \
-    --optim 'sgd' \
-    --gpu_id 6 \
     --expr 'landmark' \
-    --ncls 586 \
-    --finetune_train_path <path to train data> \
-    --finetune_val_path <path to val data> \
 ~~~
 
 ### (2) training keypoint stage:
-+ load_from: absolute path to pytorch model you wish to load. (<model_name>.pth.tar)
++ load_from: absolute path to pytorch model you wish to load. (`repo/<expr>/keypoint/ckpt/<model_name>.pth.tar`)
 + expr: name of experiment you wish to save as.
 ~~~shell
 $ cd train/
 $ python main.py \
     --stage 'keypoint' \
-    --gpu_id 6 \
-    --ncls 586 \
-    --optim 'sgd' \
     --use_random_gamma_scaling true \
     --expr 'landmark' \
     --load_from <path to model> \
-    --keypoint_train_path <path to train data> \
-    --keypoint_val_path <path to val data> \
 ~~~
 
 

@@ -48,7 +48,8 @@ def main():
         crop_size = config.keypoint_crop_size
    
     # dataloader for pretrain
-    train_loader_pt, val_loader_pt = get_loader(
+    train_loader_pt, val_loader_pt, ncls = get_loader(
+    #train_loader_pt, val_loader_pt = get_loader(
         train_path = config.train_path_for_pretraining,
         val_path = config.val_path_for_pretraining,
         stage = config.stage,
@@ -58,7 +59,8 @@ def main():
         crop_size = crop_size,
         workers = config.workers)
     # dataloader for finetune
-    train_loader_ft, val_loader_ft = get_loader(
+    train_loader_ft, val_loader_ft, ncls = get_loader(
+    # train_loader_ft, val_loader_ft = get_loader(
         train_path = config.train_path_for_finetuning,
         val_path = config.val_path_for_finetuning,
         stage = config.stage,
@@ -67,12 +69,14 @@ def main():
         sample_size = sample_size,
         crop_size = crop_size,
         workers = config.workers)
-    
+
+    print("********************", ncls, " classes*********************")
 
     # load model
     from delf import Delf_V1
     model = Delf_V1(
-        ncls = config.ncls,
+        ncls=ncls,
+        #ncls = config.ncls,
         load_from = config.load_from,
         arch = config.arch,
         stage = config.stage,

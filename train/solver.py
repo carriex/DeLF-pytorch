@@ -140,9 +140,24 @@ class Solver(object):
                     labels = labels.cuda(async=True)
                 inputs = __to_var__(inputs, volatile=True)
                 labels = __to_var__(labels, volatile=False)
-            
+
             # forward
             outputs = self.model(inputs)
+
+            # ------------DELG loss---------------#
+            # global feature
+            # l_g: cross-entropy loss of arcface-adjusted cosine similarity
+
+            # local feature
+            # l_r: mean-squared error regression loss
+            # l_a: cross entropy loss for attention module
+
+            # loss = l_g + \lambda l_{r} + \beta l_{a}
+
+            # optimizer 1: for backbone => only l_g
+            # optimizer 2: for other modules => \lambda l_{r} + \beta l_{a}
+
+
             loss = self.criterion(outputs, labels)
             
             # backward + optimize

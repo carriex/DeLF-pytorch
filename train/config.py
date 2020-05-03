@@ -39,24 +39,24 @@ parser.add_argument('--stage',
                     help='target stage: finetune | keypoint')
 parser.add_argument('--train_path_for_pretraining', 
                     # default='../../data/landmarks/landmarks_full_train',
-                    default='/home/ec2-user/dl-proj/google-landmark/index/0/',
+                    default='/data/google-landmark/test/0/1',
                     type=str)
 parser.add_argument('--val_path_for_pretraining', 
                     # default='../../data/landmarks/landmarks_full_val',
-                    default='/home/ec2-user/dl-proj/google-landmark/index/0/',
+                    default='/data/google-landmark/test/0/0',
                     type=str)
 parser.add_argument('--train_path_for_finetuning', 
                     # default='../../data/landmarks/landmarks_clean_train',
-                    default='/home/ec2-user/dl-proj/google-landmark/index/0/',
+                    default='/data/google-landmark/test/0/1',
                     type=str)
 parser.add_argument('--val_path_for_finetuning', 
                     # default='../../data/landmarks/landmarks_clean_val',
-                    default='/home/ec2-user/dl-proj/google-landmark/index/0/',
+                    default='/data/google-landmark/test/0/0',
                     type=str)
 parser.add_argument('--workers', 
                     default=20, 
                     type=int,
-                    help='number of data loading workers (default: 4)')
+                    help='number of data loading workers (default: 20)')
 # preprocessing
 parser.add_argument('--finetune_sample_size',
                     default=256,

@@ -14,16 +14,17 @@ def get_files(root_dir, ext_length):
         # remove empty directory
         subprocess.call(["rm", "-rf", os.path.abspath(root_dir)])
         return {}
-    if not any([os.path.isfile(os.path.join(root_dir,file)) for file in os.listdir(root_dir)]):
+    if not any([os.path.isfile(os.path.join(root_dir, file)) for file in os.listdir(root_dir)]):
         subprocess.call(["rm", "-rf", os.path.abspath(root_dir)])
         return {}
     else:
         files = {}
         for file in os.listdir(root_dir):
-            file_path = os.path.join(root_dir,file)
+            file_path = os.path.join(root_dir, file)
             if not os.path.isfile(file_path):
                 files.update(get_files(file_path, ext_length))
         return files
+
 
 def move_image(img_obj, output_dir="/data/google-landmark/org/train"):
     '''organize images in one single subdirectory'''
@@ -33,7 +34,6 @@ def move_image(img_obj, output_dir="/data/google-landmark/org/train"):
 
     # create the folder if not there
     label_dir = os.path.abspath(os.path.join(output_dir, str(label)))
-
 
     # move the image
     subprocess.call(["mv", file_path, label_dir])
@@ -70,7 +70,6 @@ if __name__ == "__main__":
     # get all subdirectories
     img_files = get_files(root_dir, ext_length=len(arg.extension))
 
-
     img_objs = []
 
     for i in range(len(img_ids)):
@@ -80,23 +79,3 @@ if __name__ == "__main__":
             img_objs.append({'path': img_files[img_ids[i]], 'label': label_ids[i]})
 
     p_map(move_image, img_objs)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

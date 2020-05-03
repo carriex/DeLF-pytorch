@@ -146,6 +146,18 @@ class Delf_V1(nn.Module):
                 # endpoint: attn, pool
                 self.__register_module__('attn', SpatialAttention2d(in_c=in_c, act_fn='relu'))
                 self.__register_module__('pool', WeightedSum2d())
+            elif self.stage in ['delg']:
+                '''delg modules '''
+                #------------global feature---------------#
+                # extract shallow features (with relu)
+                # generalized pooling with whitening
+                # g = F * (gem)^(1/p) + b_{f}
+                # ------------local feature---------------#
+                # extract deep features
+                # attention layer
+                # conv autoencoder
+                pass
+
 
 
             if self.stage not in ['inference']:

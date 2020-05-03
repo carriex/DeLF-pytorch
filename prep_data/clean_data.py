@@ -16,11 +16,13 @@ import torchvision.models as models
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
+
 def gem(x, p=3, eps=1e-6):
     '''generalized mean pooling'''
-    m =  nn.AvgPool2d((x.size(-2), x.size(-1)))
+    m = nn.AvgPool2d((x.size(-2), x.size(-1)))
     m.to(device)
-    return m(x.clamp(min=eps).pow(p)).pow(1/p)
+    return m(x.clamp(min=eps).pow(p)).pow(1 / p)
+
 
 def set_seed(seed=1234567):
     random.seed(seed)
@@ -30,6 +32,7 @@ def set_seed(seed=1234567):
 
 class GoogleLandmark(Dataset):
     '''dataset without low frequency images'''
+
     def __init__(self, data_dir, data_csv, label_column):
         self.data_dir = data_dir
         self.data_csv = pd.read_csv(data_csv)
@@ -37,11 +40,11 @@ class GoogleLandmark(Dataset):
         self.labels = self.filter_infrequent_class()
         self.samples = self.get_samples()
         self.img_transform = transforms.Compose([
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406],
-                                     [0.229, 0.224, 0.225])
-            ])
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406],
+                                 [0.229, 0.224, 0.225])
+        ])
 
     def filter_infrequent_class(self, min_count=4):
         class_count = self.data_csv.groupby(self.label_column).count().id.to_numpy()
@@ -60,7 +63,7 @@ class GoogleLandmark(Dataset):
     def __getitem__(self, idx):
         '''return (img_id, transformed feature, label)'''
         img_id, label = self.samples[idx]
-        img_path = os.path.join(self.data_dir, str(label), str(img_id)+'.jpg')
+        img_path = os.path.join(self.data_dir, str(label), str(img_id) + '.jpg')
         img = Image.open(img_path)
         return img_id, self.img_transform(img), label
 
@@ -112,6 +115,7 @@ def create_clean_data(label, images_per_label):
     labels = np.ones_like(img_idx) * int(label)
     return np.array((img_ids, labels)).T
 
+
 if __name__ == "__main__":
 
     # set seed
@@ -121,12 +125,14 @@ if __name__ == "__main__":
 
     argparse.add_argument("-c", "--csv_file", help="csv file containing instance to label mapping",
                           dest="csv_file", default="/data/google-landmark/csv/train.csv")
-    argparse.add_argument("-o", "--output_file", help="output csv file name for the clean training data", dest="output_file",
+    argparse.add_argument("-o", "--output_file", help="output csv file name for the clean training data",
+                          dest="output_file",
                           default='/data/google-landmark/csv/train-clean.csv')
     argparse.add_argument("-l", "--label_column", help="column name storing label id",
                           dest="label_column",
                           default='landmark_id')
-    argparse.add_argument("-f", "--feature_file", help="output npy file name for the extracted ResNet features of the image",
+    argparse.add_argument("-f", "--feature_file",
+                          help="output npy file name for the extracted ResNet features of the image",
                           dest="feature_file",
                           default='/data/google-landmark/train-feature.npy')
     argparse.add_argument("-d", "--data_dir", help="root image folder", dest="data_dir",
@@ -185,7 +191,7 @@ if __name__ == "__main__":
         img_idx.append(create_clean_data(label, images_per_label))
 
     # img_idx, labels
-    images = np.concatenate([idx for idx in img_idx if idx is not None ])
+    images = np.concatenate([idx for idx in img_idx if idx is not None])
     clean_data = {'id': images[:, 0],
                   args.label_column: images[:, 1].astype(float).astype(int)}
 
