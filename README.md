@@ -1,5 +1,5 @@
 
-# Pytorch Implementation of Deep Local Feature (DeLF)
+# Pytorch Implementation of DeLG
 PyTorch Implementation of "Unifying Deep Local and Global Features for Image Search"      
 
 reference: https://arxiv.org/pdf/2001.05027.pdf
