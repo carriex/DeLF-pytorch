@@ -73,15 +73,16 @@ def main():
     print("********************", ncls, " classes*********************")
 
     # load model
-    from delf import Delf_V1
-    model = Delf_V1(
+    from delg import DELG
+    model = DELG(
         ncls=ncls,
-        #ncls = config.ncls,
-        load_from = config.load_from,
-        arch = config.arch,
-        stage = config.stage,
-        target_layer = config.target_layer,
-        use_random_gamma_rescale = config.use_random_gamma_rescale)
+        load_from=config.load_from,
+        arch='resnet50',
+        stage=config.stage,
+        target_layer='layer3',
+        use_random_gamma_rescale=False
+    )
+
 
     # solver
     from solver import Solver
@@ -107,7 +108,7 @@ def main():
             val_loader = val_loader_ft
 
         solver.train('train', epoch, train_loader, val_loader)
-        solver.train('val', epoch, train_loader, val_loader)
+        # solver.train('val', epoch, train_loader, val_loader)
 
     print('Congrats! You just finished DeLF training.')
 

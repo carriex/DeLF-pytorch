@@ -59,11 +59,11 @@ parser.add_argument('--workers',
                     help='number of data loading workers (default: 20)')
 # preprocessing
 parser.add_argument('--finetune_sample_size',
-                    default=256,
+                    default=512,
                     type=int,
                     help='finetune resize (default: 256)')
 parser.add_argument('--finetune_crop_size',
-                    default=224,
+                    default=512,
                     type=int,
                     help='finetune crop (default: 224)')
 parser.add_argument('--keypoint_sample_size', 
@@ -84,15 +84,15 @@ parser.add_argument('--use_random_gamma_rescale',
                     help='apply gamma rescaling in range of [0.3535, 1.0]')
 # training parameters
 parser.add_argument('--finetune_epoch',
-                    default=30,
+                    default=20,
                     type=int,
                     help='number of total epochs for finetune stage.')
 parser.add_argument('--keypoint_epoch',
-                    default=30,
+                    default=20,
                     type=int,
                     help='number of total epochs for keypoint stage.')
 parser.add_argument('--lr',
-                    default=0.008,
+                    default=0.001,
                     type=float,
                     help='initial learning rate')
 parser.add_argument('--lr_gamma',

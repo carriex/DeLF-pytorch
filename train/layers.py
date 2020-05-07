@@ -83,6 +83,39 @@ class WeightedSum2d(nn.Module):
         return self.__class__.__name__
 
 
+class GeneralizedMeanPooling(nn.Module):
+    '''Generalized mean pooling'''
+    def __init__(self, in_dim, p, eps):
+        super(GeneralizedMeanPooling, self).__init__()
+        self.in_dim = in_dim
+        self.p = p
+        self.eps = eps
+        self.m = nn.AvgPool2d(in_dim, in_dim)
+    def forward(self, x):
+        y = self.m(x.clamp(min=self.eps).pow(self.p)).pow( 1 / self.p)
+        y_ = torch.squeeze(y)
+        return y_
+
+
+class ConvAutoEncoder(nn.Module):
+    '''Generalized mean pooling'''
+    def __init__(self, in_dim, out_dim):
+        super(ConvAutoEncoder, self).__init__()
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.encoder_layer = nn. Sequential(
+            nn.Conv2d(in_dim, out_dim, kernel_size=(1, 1)),
+            nn.ReLU(True))
+        self.decoder_layer = nn. Sequential(
+            nn.ConvTranspose2d(out_dim, in_dim, kernel_size=(1, 1)),
+            nn.ReLU(True))
+
+    def forward(self, x):
+        encoded_x = self.encoder_layer(x)
+        reconstructed_x = self.decoder_layer(encoded_x)
+        return encoded_x, reconstructed_x
+
+
 class SpatialAttention2d(nn.Module):
     '''
     SpatialAttention2d

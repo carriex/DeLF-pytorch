@@ -49,51 +49,28 @@ def get_loader(
     crop_size,
     workers):
 
-    if stage in ['finetune']:
-        # for train
-        prepro = []
-        prepro.append(transforms.Resize(size=sample_size))
-        prepro.append(transforms.CenterCrop(size=sample_size))
-        prepro.append(transforms.RandomCrop(size=crop_size, padding=0))
-        prepro.append(transforms.RandomHorizontalFlip())
-        #prepro.append(transforms.RandomRotation((-15, 15)))        # experimental.
-        prepro.append(transforms.ToTensor())
-        train_transform = transforms.Compose(prepro)
-        train_path = train_path
-        
-        # for val
-        prepro = []
-        prepro.append(transforms.Resize(size=sample_size))
-        prepro.append(transforms.CenterCrop(size=crop_size))
-        prepro.append(transforms.ToTensor())
-        val_transform = transforms.Compose(prepro)
-        val_path = val_path
+    prepro = []
+    prepro.append(transforms.Resize(size=(sample_size,sample_size)))
+    # prepro.append(transforms.CenterCrop(size=sample_size))
+    # ------------random crop----------------#
+    # prepro.append(transforms.RandomCrop(size=crop_size, padding=0))
+    # ------------distort aspect ratio----------------#
+    # prepro.append(transforms.RandomPerspective())
+    prepro.append(transforms.ToTensor())
+    train_transform = transforms.Compose(prepro)
+    train_path = train_path
 
-    elif stage in ['keypoint']:
-        # for train
-        prepro = []
-        prepro.append(transforms.Resize(size=sample_size))
-        prepro.append(transforms.CenterCrop(size=sample_size))
-        prepro.append(transforms.RandomCrop(size=crop_size, padding=0))
-        prepro.append(transforms.RandomHorizontalFlip())
-        #prepro.append(transforms.RandomRotation((-15, 15)))        # experimental.
-        prepro.append(transforms.ToTensor())
-        train_transform = transforms.Compose(prepro)
-        train_path = train_path
-        
-        # for val
-        prepro = []
-        prepro.append(transforms.Resize(size=sample_size))
-        prepro.append(transforms.CenterCrop(size=crop_size))
-        prepro.append(transforms.ToTensor())
-        val_transform = transforms.Compose(prepro)
-        val_path = val_path
+    # for val
+    prepro = []
+    prepro.append(transforms.Resize(size=(sample_size,sample_size)))
+    # prepro.append(transforms.CenterCrop(size=crop_size))
+    prepro.append(transforms.ToTensor())
+    val_transform = transforms.Compose(prepro)
+    val_path = val_path
+
+
     
     # image folder dataset.
-    # train_dataset = datasets.ImageFolder(root = train_path,
-    #                                      transform = train_transform)
-    # val_dataset = datasets.ImageFolder(root = val_path,
-    #                                    transform = val_transform)
 
     #------------hardcode dataset path for now----------------#
     train_dataset = GoogleLandmark(data_dir='/data/google-landmark/org/train',
