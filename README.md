@@ -15,7 +15,8 @@ After the train process is done, model will be saved at `repo/devel/finetune/ckp
 
 ~~~shell
 $ cd train/
-$ python main.py 
+$ python main.py \
+>>>>>>> updated README
 ~~~
 
 ## Feature Extraction of DeLG
@@ -29,3 +30,4 @@ $ python extractor.py
 ~~~shell
 $ python test.py
 ~~~
+

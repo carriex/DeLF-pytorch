@@ -72,25 +72,25 @@ def __cuda__(model):
     return model
 
 '''global feature loss function'''
-class ArcFaceMargin(nn.Module):
+class ArcFaceCrossEntropyLoss(nn.Module):
     def __init__(self, m):
-        super(ArcFaceMargin, self).__init__()
+        super(ArcFaceCrossEntropyLoss, self).__init__()
         self.m = m
         self.s = torch.randn(1)
-        self.s.requires_grad = True
+        self.log_softmax = nn.LogSoftmax(dim=1)
         if torch.cuda.is_available():
-            self.s = self.s.cuda()
+            self.s.cuda()
+            self.log_softmax.cuda()
     def forward(self, x, label):
         '''x: (num_of_class,) label: (1,)'''
-        pred = torch.zeros(x.shape)
+        # create one-hot encoding
+        pred = torch.zeros(x.shape) # 8 x 1000
         if torch.cuda.is_available():
             pred = pred.cuda()
         label = torch.unsqueeze(label, 1)
         pred.scatter_(1, label, 1 )
         result = torch.cos(torch.acos(x) + self.m) * pred + (1-pred) * x
-        if torch.cuda.is_available():
-            result = result.cuda()
-        return result * self.s
+        return torch.mean(-1 * self.log_softmax(result))
 
 
 
@@ -121,7 +121,7 @@ class DELG(nn.Module):
         self.local_module_list = nn.ModuleList()
         self.img_dim = 16 # for generalized mean pooling : hard code for now
 
-        # in_c = self.__get_in_c__()
+        in_c = self.__get_in_c__()
         use_pretrained_base = True
         # exclude from copying model
         exclude = ['avgpool', 'fc']
@@ -160,6 +160,7 @@ class DELG(nn.Module):
             # attention layer
             self.__register_module__('attn', SpatialAttention2d(in_c=1024, act_fn='relu'), self.local_module_list)
             self.__register_module__('attn_pool', WeightedSum2d(), self.local_module_list)
+
             submodules = []
             submodules.append(nn.Conv2d(1024, ncls, 1))
             submodules.append(Flatten())
@@ -169,9 +170,9 @@ class DELG(nn.Module):
             # inference time
             if self.stage in ['inference']:
                 load_dict = torch.load(self.load_from)
-                __load_weights_from__(self.module_dict, load_dict, modulenames=['base'], )
-                __load_weights_from__(self.module_dict, load_dict, modulenames=['layer4', 'gem', 'whitening', 'global_fc'], )
-                __load_weights_from__(self.module_dict, load_dict, modulenames=['attn', 'attn_pool', 'convae', 'local_fc'])
+                self.__load_weights_from__(load_dict, modulenames=['base'], feature_type='base')
+                self.__load_weights_from__(load_dict, modulenames=['layer4', 'gem', 'whitening'], feature_type='global')
+                self.__load_weights_from__(load_dict, modulenames=['attn', 'attn_pool', 'convae'], feature_type='global')
                 print('load model from "{}"'.format(load_from))
 
     def __register_module__(self, modulename, module, module_list):
@@ -223,15 +224,19 @@ class DELG(nn.Module):
         return copy.deepcopy(self.end_points[modulename].data.cpu())
 
     def write_to(self, state):
-        state['base'] = self.module_dict['base'].state_dict()
-        state['layer4'] = self.module_dict['layer4'].state_dict()
-        state['gem'] = self.module_dict['gem'].state_dict()
-        state['whitening'] = self.module_dict['whitening'].state_dict()
-        state['global_fc'] = self.module_dict['global_fc'].state_dict()
-        state['convae'] = self.module_dict['convae'].state_dict()
-        state['attn'] = self.module_dict['attn'].state_dict()
-        state['attn_pool'] = self.module_dict['attn_pool'].state_dict()
-        state['local_fc'] = self.module_dict['local_fc'].state_dict()
+        if self.stage in ['finetune']:
+            state['base'] = self.module_dict['base'].state_dict()
+            state['layer4'] = self.module_dict['layer4'].state_dict()
+            state['pool'] = self.module_dict['pool'].state_dict()
+            state['logits'] = self.module_dict['logits'].state_dict()
+        elif self.stage in ['keypoint']:
+            state['base'] = self.module_dict['base'].state_dict()
+            state['attn'] = self.module_dict['attn'].state_dict()
+            state['pool'] = self.module_dict['pool'].state_dict()
+            state['logits'] = self.module_dict['logits'].state_dict()
+        else:
+            assert self.stage in ['inference']
+            raise ValueError('inference does not support model saving!')
 
     def forward_for_serving(self, x):
         '''
@@ -239,22 +244,16 @@ class DELG(nn.Module):
         without saving to endpoint dict.
         '''
         x = self.__forward_and_save__(x, 'base')
-        _, decoded_x = self.__forward_and_save__(x, 'convae')
-        local_feature_reconstructed = F.normalize(decoded_x, p=2, dim=1)
-        ret_x = local_feature_reconstructed
-        attn_score = self.__forward_and_save__(ret_x, 'attn')
+        if self.target_layer in ['layer4']:
+            x = self.__forward_and_save__(x, 'layer4')
+        ret_x = x
+        if self.use_l2_normalized_feature:
+            attn_x = F.normalize(x, p=2, dim=1)
+        else:
+            attn_x = x
+        attn_score = self.__forward_and_save__(x, 'attn')
         ret_s = attn_score
         return ret_x.data.cpu(), ret_s.data.cpu()
-
-    def extract_global_feature(self, x):
-        '''
-        This function extracts global features
-        '''
-        global_x = self.__forward_and_save__(x, 'base')
-        global_x = self.__forward_and_save__(global_x, 'layer4')
-        global_x = self.__forward_and_save__(global_x, 'gem')
-        global_feature = F.normalize(global_x, p=2, dim=1)
-        return global_feature
 
     def forward(self, x):
         # x: (3, 512, 512)
@@ -266,12 +265,10 @@ class DELG(nn.Module):
             global_x = self.__forward_and_save__(global_x, 'gem')
             global_x = self.__forward_and_save__(global_x, 'whitening')
             global_feature = F.normalize(global_x, p=2, dim=1)
-            with torch.no_grad():
-                self.module_dict['global_fc'].weight.div_(torch.norm(self.module_dict['global_fc'].weight, dim=1, keepdim=True))
             global_classification_output = self.__forward_and_save__(global_feature, 'global_fc')
             # ------------auto encoder---------------#
             local_feature = x
-            _, decoded_x = self.__forward_and_save__(x, 'convae')
+            decoded_x = self.__forward_and_save__(x, 'convae')
             local_feature_reconstructed = F.normalize(decoded_x, p=2, dim=1)
             # ------------local feature---------------#
             # attention layer
