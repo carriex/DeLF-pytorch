@@ -15,10 +15,17 @@ After the train process is done, model will be saved at `repo/devel/finetune/ckp
 
 ~~~shell
 $ cd train/
-$ python main.py \
+$ python main.py 
 ~~~
 
 ## Feature Extraction of DeLG
 
-// To be updated
+~~~shell
+$ cd extraction/
+$ python extractor.py 
+~~~
 
+## Evaluation 
+~~~shell
+$ python test.py
+~~~
