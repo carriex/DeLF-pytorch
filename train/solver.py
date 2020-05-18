@@ -69,18 +69,21 @@ class Solver(object):
         self.AFMargin = ArcFaceMargin(m=0.1)
         self.mse_loss = nn.MSELoss()
 
+        if torch.cuda.is_available():
+            self.cross_entropy_loss.cuda()
+            self.AFMargin.cuda()
+            self.mse_loss.cuda()
+
         # ------------DELG optimizer---------------#
         self.global_feature_optimizer = optim.SGD(
             filter(lambda p: p.requires_grad, self.model.global_module_list.parameters()),
             lr=config.lr,
-            weight_decay=config.weight_decay,
-            momentum=0.9)
+            weight_decay=config.weight_decay) #remove momentum
 
         self.local_feature_optimizer = optim.SGD(
             filter(lambda p: p.requires_grad, self.model.local_module_list.parameters()),
             lr=config.lr,
-            weight_decay=config.weight_decay,
-            momentum=0.9)
+            weight_decay=config.weight_decay) #remove momentum
 
         # decay learning rate by a factor of 0.5 every 10 epochs
         self.global_feature_lr_scheduler = optim.lr_scheduler.LambdaLR(
@@ -108,7 +111,7 @@ class Solver(object):
         self.logger['train'].set_names(
             ['epoch', 'global_lr', 'local_lr', 'global_losses', 'local_losses'])
         self.logger['val'].set_names(
-            ['epoch', 'lr', 'loss', 'top1_accu', 'top3_accu', 'top5_accu'])
+            ['epoch', 'global_lr', 'local_lr', 'global_losses', 'local_losses'])
 
     def __exit__(self):
         self.train_logger.close()
@@ -149,8 +152,6 @@ class Solver(object):
         since = time.time()
         bar = Bar('[{}]{}'.format(mode.upper(), self.title), max=len(dataloader))
 
-        self.global_feature_lr_scheduler.step()
-        self.local_feature_lr_scheduler.step()
 
         for batch_idx, (inputs, labels) in enumerate(dataloader):
             # measure data loading time
@@ -172,15 +173,16 @@ class Solver(object):
 
             # forward
             global_classification_output, local_classification_output, local_feature_reconstructed, local_feature = self.model(
-                inputs)
-
+               inputs)
+            # global_classification_output = self.model(inputs)
 
             # backward + optimize
             if mode in ['train']:
                 # ------------global feature---------------#
                 self.global_feature_optimizer.zero_grad()
-                __unfreeze_weights__(self.model.global_module_list)
-                l_g = self.cross_entropy_loss(self.AFMargin(global_classification_output, labels), labels)
+                # __unfreeze_weights__(self.model.global_module_list)
+                # l_g = self.cross_entropy_loss(self.AFMargin(global_classification_output, labels), labels)
+                l_g = self.cross_entropy_loss(global_classification_output, labels)
                 l_g.backward(retain_graph=True) # as we will call again
                 self.global_feature_optimizer.step()
                 # ------------local feature---------------#
@@ -189,24 +191,28 @@ class Solver(object):
                 H_S, W_S, C_S = local_feature.shape[1:]
                 l_r = (1 / H_S * W_S * C_S) * self.mse_loss(local_feature_reconstructed, local_feature)
                 l_a = self.cross_entropy_loss(local_classification_output, labels)
-                l_l = 10 * l_r + 1 * l_a
+                #l_l = 10 * l_r + 1 * l_a
+                l_l = l_a
                 l_l.backward()
                 self.local_feature_optimizer.step()
                 __unfreeze_weights__(self.model.global_module_list)
 
-                local_prec_1, local_prec_3, local_prec_5 = compute_precision_top_k(
-                    __to_tensor__(local_classification_output),
-                    __to_tensor__(labels),
-                    top_k=(1, 3, 5))
+            local_prec_1, local_prec_3, local_prec_5 = compute_precision_top_k(
+                __to_tensor__(local_classification_output),
+                __to_tensor__(labels),
+                top_k=(1, 3, 5))
 
-                global_prec_1, global_prec_3, global_prec_5 = compute_precision_top_k(
-                    __to_tensor__(global_classification_output),
-                    __to_tensor__(labels),
-                    top_k=(1, 3, 5))
+            global_prec_1, global_prec_3, global_prec_5 = compute_precision_top_k(
+                __to_tensor__(global_classification_output),
+                __to_tensor__(labels),
+                top_k=(1, 3, 5))
 
             batch_size = inputs.size(0)
-            global_losses.update(l_g.item(), batch_size)
-            local_losses.update(l_l.item(), batch_size)
+
+            if mode in ['train']:
+                global_losses.update(l_g.item(), batch_size)
+                local_losses.update(l_l.item(), batch_size)
+
             local_prec_top1.update(local_prec_1, batch_size)
             local_prec_top3.update(local_prec_3, batch_size)
             local_prec_top5.update(local_prec_5, batch_size)
@@ -248,7 +254,7 @@ class Solver(object):
             bar.next()
         bar.finish()
 
-        # write to logger
+        #write to logger
         self.logger[mode].append([self.epoch + 1,
                                   self.global_feature_lr_scheduler.get_lr()[0],
                                   self.local_feature_lr_scheduler.get_lr()[0],
@@ -256,12 +262,16 @@ class Solver(object):
                                   local_losses.avg])
 
         # save model
-        state = {
-            'epoch': self.epoch,
-        }
-        self.model.write_to(state)
-        filename = 'model.pth.tar'
-        self.__save_checkpoint__(state, ckpt=self.ckpt_path, filename=filename)
+        if mode == 'train':
+            state = {
+                'epoch': self.epoch,
+            }
+            self.model.write_to(state)
+            filename = 'model.pth.tar'
+            self.__save_checkpoint__(state, ckpt=self.ckpt_path, filename=filename)
+
+            self.global_feature_lr_scheduler.step()
+            self.local_feature_lr_scheduler.step()
 
     def train(self, mode, epoch, train_loader, val_loader):
         self.epoch = epoch

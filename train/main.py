@@ -30,8 +30,7 @@ def main():
     use_cuda = torch.cuda.is_available()
 
     # Random seed
-    if config.manualSeed is None:
-        config.manualSeed = random.randint(1, 10000)
+    config.manualSeed = 88888 #random.randint(1, 10000)
     random.seed(config.manualSeed)
     torch.manual_seed(config.manualSeed)
     if use_cuda:
@@ -71,6 +70,7 @@ def main():
         workers = config.workers)
 
     print("********************", ncls, " classes*********************")
+    print("********************", config.expr, "*********************")
 
     # load model
     from delg import DELG
@@ -83,7 +83,6 @@ def main():
         use_random_gamma_rescale=False
     )
 
-
     # solver
     from solver import Solver
     solver = Solver(config=config, model=model)
@@ -91,6 +90,8 @@ def main():
         epochs = config.finetune_epoch
     elif config.stage in ['keypoint']:
         epochs = config.keypoint_epoch
+
+    print("********************", epochs, "*********************")
 
     # train/test for N-epochs. (50%: pretain with datasetA, 50%: finetune with datasetB)
     for epoch in range(epochs):
@@ -108,7 +109,7 @@ def main():
             val_loader = val_loader_ft
 
         solver.train('train', epoch, train_loader, val_loader)
-        # solver.train('val', epoch, train_loader, val_loader)
+        #solver.train('val', epoch, train_loader, val_loader)
 
     print('Congrats! You just finished DeLF training.')
 

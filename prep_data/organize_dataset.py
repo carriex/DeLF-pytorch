@@ -25,6 +25,7 @@ def get_files(root_dir, ext_length):
                 files.update(get_files(file_path, ext_length))
         return files
 
+
 def move_image(img_obj, output_dir="/data/google-landmark/org/train"):
     '''organize images in one single subdirectory'''
 
@@ -68,11 +69,6 @@ if __name__ == "__main__":
 
     # get all subdirectories
     img_files = get_files(root_dir, ext_length=len(arg.extension))
-
-<<<<<<< HEAD
-=======
-
->>>>>>> updated README
     img_objs = []
 
     for i in range(len(img_ids)):

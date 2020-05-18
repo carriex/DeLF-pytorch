@@ -19,10 +19,13 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True  # to avoid error "https://github.com/pyt
 
 class GoogleLandmark(torch.utils.data.Dataset):
     '''google landmark dataset'''
-    def __init__(self, data_dir, data_csv, transform):
+    def __init__(self, data_dir, data_csv, transform, idx_to_class=None):
         self.data_dir = data_dir
         self.data_csv = pd.read_csv(data_csv)
-        self.idx_to_class = self.data_csv.landmark_id.unique()
+        if idx_to_class is not None:
+            self.idx_to_class = idx_to_class
+        else:
+            self.idx_to_class = self.data_csv.landmark_id.unique()
         self.class_to_idx = {class_name: idx for (idx, class_name) in enumerate(self.idx_to_class)}
         self.num_classes = len(self.idx_to_class)
         self.transform = transform
@@ -50,6 +53,10 @@ def get_loader(
     workers):
 
     prepro = []
+<<<<<<< HEAD
+=======
+    print(sample_size)
+>>>>>>> add retrieval code
     prepro.append(transforms.Resize(size=(sample_size,sample_size)))
     # prepro.append(transforms.CenterCrop(size=sample_size))
     # ------------random crop----------------#
@@ -78,13 +85,18 @@ def get_loader(
                                    transform=train_transform)
     val_dataset = GoogleLandmark(data_dir='/data/google-landmark/org/train',
                                  data_csv='/data/google-landmark/csv/val-clean-1000.csv',
+<<<<<<< HEAD
                                  transform=val_transform)
+=======
+                                 transform=val_transform,
+                                 idx_to_class=train_dataset.idx_to_class)
+>>>>>>> add retrieval code
 
 
     # return train/val dataloader
     train_loader = torch.utils.data.DataLoader(dataset = train_dataset,
                                                batch_size = train_batch_size,
-                                               shuffle = True,
+                                               shuffle = False,
                                                num_workers = workers)
     val_loader = torch.utils.data.DataLoader(dataset = val_dataset,
                                              batch_size = val_batch_size,

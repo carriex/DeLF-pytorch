@@ -11,7 +11,7 @@ import torch
 import torchvision.transforms as transforms
 
 import helper.delf_helper as delf_helper
-from train.delf import Delf_V1
+from train.delg import DELG
 
 __DEBUG__ = False
 
@@ -53,10 +53,10 @@ class Feeder():
         self.workers = feeder_config.get('WORKERS')
 
         # load pytorch model
-        print('load DeLF pytorch model...')
+        print('load DeLG pytorch model...')
         delf_config = __build_delf_config__(feeder_config) 
-        self.model = Delf_V1(
-            ncls = delf_config.ncls,
+        self.model = DELG(
+            ncls = 1000,
             load_from = delf_config.load_from,
             arch = delf_config.arch,
             stage = delf_config.stage,
@@ -67,12 +67,11 @@ class Feeder():
         
         # load pca matrix
         print('load PCA parameters...')
-        h5file = h5py.File(feeder_config.get('PCA_PARAMETERS_PATH'), 'r')
-        self.pca_mean = h5file['.']['pca_mean'].value
-        self.pca_vars = h5file['.']['pca_vars'].value
-        self.pca_matrix = h5file['.']['pca_matrix'].value
-        self.pca_dims = feeder_config.get('PCA_DIMS')
-        self.use_pca = feeder_config.get('USE_PCA')
+        self.use_pca = False
+        self.pca_mean = None
+        self.pca_vars = None
+        self.pca_matrix = None
+        self.pca_dims = None
 
         # !!! stride value in tensorflow inference code is not applicable for pytorch, because pytorch works differently.
         # !!! make sure to use stride=16 for target_layer=='layer3'.

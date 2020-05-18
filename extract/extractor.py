@@ -4,8 +4,7 @@ extract DeLF local features
 '''
 
 import os, sys, time
-sys.path.append('../')
-sys.path.append('../train')
+sys.path = ['../'] + sys.path
 import argparse
 
 import torch
@@ -19,8 +18,8 @@ import h5py
 import pickle
 import copy
 
-import delf_helper
-from train.delf import Delf_V1
+from helper import delf_helper
+from train.delg import DELG
 from pca import DelfPCA
 from folder import ImageFolder
 from utils import mkdir_p, Bar, AverageMeter
@@ -48,7 +47,7 @@ def __build_delf_config__(data):
     parser = argparse.ArgumentParser('delf-config')
     parser.add_argument('--stage', type=str, default='inference')
     parser.add_argument('--expr', type=str, default='dummy')
-    parser.add_argument('--ncls', type=str, default='dummy')
+    parser.add_argument('--ncls', type=str, default=1000)
     parser.add_argument('--use_random_gamma_rescale', type=str, default=False)
     parser.add_argument('--arch', type=str, default=data['ARCH'])
     parser.add_argument('--load_from', type=str, default=data['LOAD_FROM'])
@@ -85,7 +84,7 @@ class FeatureExtractor():
         # load pytorch model
         print('load DeLF pytorch model...')
         delf_config = __build_delf_config__(extractor_config) 
-        self.model = Delf_V1(
+        self.model = DELG(
             ncls = delf_config.ncls,
             load_from = delf_config.load_from,
             arch = delf_config.arch,
@@ -94,7 +93,8 @@ class FeatureExtractor():
             use_random_gamma_rescale = False)
         self.model.eval()
         self.model = __cuda__(self.model)
-        
+
+        self.use_pca = False
         # load pca matrix
         if self.mode.lower() in ['delf']:
             if self.use_pca:
@@ -144,6 +144,18 @@ class FeatureExtractor():
             x = x.mul(scale).add(bias)
             return x
 
+    def __extract_global_feature__(self, x, filename):
+        try:
+            output = delf_helper.GetGlobalFeatureFromMultiScale(
+                x=x,
+                model=self.model,
+                filename=filename,
+                scale_list=[0.7, 1, 1.4],
+                workers=4)
+            return output
+        except Exception as e:
+            print('\n[Error] filename:{}, error message:{}'.format(filename, e))
+            return None
 
     def __extract_delf_feature__(self, x, filename, mode='pca'):
         '''extract raw features from image batch.
@@ -227,7 +239,7 @@ class FeatureExtractor():
         np_feature_maps = []
         np_feature_maps = [x.numpy() for _, x in enumerate(feature_maps)]
         np_feature_maps = np.asarray(np_feature_maps)
-        
+
         # save features, labels to h5 file.
         h5file = h5py.File(filename, 'w')
         h5file.create_dataset('feature_maps', data=np_feature_maps)
@@ -249,121 +261,76 @@ class FeatureExtractor():
         self.dataloader = torch.utils.data.DataLoader(
             dataset = dataset,
             batch_size = 1,
-            shuffle = True,
+            shuffle = False,
             num_workers = 0)
         feature_maps = []
-        if self.mode.lower() in ['pca']:
-            bar = Bar('[{}]{}'.format(self.mode.upper(), self.title), max=len(self.dataloader))
-            for batch_idx, (inputs, _, filename) in enumerate(self.dataloader):
-                # image size upper limit.
-                if not (len(inputs.size()) == 4):
-                    if __DEBUG__:
-                        print('wrong input dimenstion! ({},{})'.format(filename, input.size()))
-                    continue;
-                if not (inputs.size(2)*inputs.size(3) <= 1200*1200):
-                    if __DEBUG__:
-                        print('passed: image size too large! ({},{})'.format(filename, inputs.size()))
-                    continue;
-                if not (inputs.size(2) >= 112 and inputs.size(3) >= 112):
-                    if __DEBUG__:
-                        print('passed: image size too small! ({},{})'.format(filename, inputs.size()))
-                    continue;
-                
-                data_timer.update(time.time() - since)
-                # prepare inputs
-                if __is_cuda__():
-                    inputs = __cuda__(inputs)
-                inputs = __to_var__(inputs)
-                
-                # get delf feature only for pca calculation.
-                pca_feature = self.__extract_delf_feature__(inputs.data, filename, mode='pca')
-                if pca_feature is not None:
-                    feature_maps.extend(pca_feature)
-               
-                batch_timer.update(time.time() - since)
-                since = time.time()
-            
-                # progress
-                log_msg  = ('\n[Extract][Processing:({batch}/{size})] '+ \
-                            'eta: (data:{data:.3f}s),(batch:{bt:.3f}s),(total:{tt:})') \
-                .format(
-                    batch=batch_idx + 1,
-                    size=len(self.dataloader),
-                    data=data_timer.val,
-                    bt=batch_timer.val,
-                    tt=bar.elapsed_td)
-                print(log_msg)
-                bar.next()
-                print('\nnumber of selected features so far: {}'.format(len(feature_maps)))
-                if len(feature_maps) >= 10000000:        # UPPER LIMIT.
-                    break;
-                
-                # free GPU cache every.
-                if batch_idx % 10 == 0:
-                    torch.cuda.empty_cache()
-                    if __DEBUG__:
-                        print('GPU Memory flushed !!!!!!!!!')
+        bar = Bar('[{}]{}'.format(self.mode.upper(), self.title), max=len(self.dataloader))
 
-            # trian PCA.
-            self.pca(feature_maps)
-        
-        else:
-            bar = Bar('[{}]{}'.format(self.mode.upper(), self.title), max=len(self.dataloader))
-            assert self.mode.lower() in ['delf']
-            feature_maps = []
-            for batch_idx, (inputs, labels, filename) in enumerate(self.dataloader):
-                # image size upper limit.
-                if not (len(inputs.size()) == 4):
-                    if __DEBUG__:
-                        print('wrong input dimenstion! ({},{})'.format(filename, input.size()))
-                    continue;
-                if not (inputs.size(2)*inputs.size(3) <= 1200*1200):
-                    if __DEBUG__:
-                        print('passed: image size too large! ({},{})'.format(filename, inputs.size()))
-                    continue;
-                if not (inputs.size(2) >= 112 and inputs.size(3) >= 112):
-                    if __DEBUG__:
-                        print('passed: image size too small! ({},{})'.format(filename, inputs.size()))
-                    continue;
-                
-                data_timer.update(time.time() - since)
-                # prepare inputs
-                if __is_cuda__():
-                    inputs = __cuda__(inputs)
-                inputs = __to_var__(inputs)
-                    
-                # get delf everything (score, feature, etc.)
-                delf_feature = self.__extract_delf_feature__(inputs.data, filename, mode='delf')
-                if delf_feature is not None:
-                    feature_maps.append(delf_feature)
-               
-                # log.
-                batch_timer.update(time.time() - since)
-                since = time.time()
-                log_msg  = ('\n[Extract][Processing:({batch}/{size})] '+ \
-                            'eta: (data:{data:.3f}s),(batch:{bt:.3f}s),(total:{tt:})') \
-                .format(
-                    batch=batch_idx + 1,
-                    size=len(self.dataloader),
-                    data=data_timer.val,
-                    bt=batch_timer.val,
-                    tt=bar.elapsed_td)
-                print(log_msg)
-                bar.next()
-                
-                # free GPU cache every.
-                if batch_idx % 10 == 0:
-                    torch.cuda.empty_cache()
-                    if __DEBUG__:
-                        print('GPU Memory flushed !!!!!!!!!')
-                
-            # use pickle to save DeLF features.
-            self.__save_delf_features_to_file__(feature_maps, output_path)
+        #to_tensor = transforms.ToTensor()
+
+        feature_maps = []
+        global_feature_maps = []
+
+        for batch_idx, (inputs, labels, filename) in enumerate(self.dataloader):
+            # image size upper limit.
+            if not (len(inputs.size()) == 4):
+                if __DEBUG__:
+                    print('wrong input dimenstion! ({},{})'.format(filename, input.size()))
+                continue;
+            if not (inputs.size(2)*inputs.size(3) <= 1200*1200):
+                if __DEBUG__:
+                    print('passed: image size too large! ({},{})'.format(filename, inputs.size()))
+                continue;
+            if not (inputs.size(2) >= 112 and inputs.size(3) >= 112):
+                if __DEBUG__:
+                    print('passed: image size too small! ({},{})'.format(filename, inputs.size()))
+                continue;
+
+            data_timer.update(time.time() - since)
+            # prepare inputs
+            if __is_cuda__():
+                inputs = __cuda__(inputs)
+            inputs = __to_var__(inputs)
+
+            # #get delf everything (score, feature, etc.)
+            delf_feature = self.__extract_delf_feature__(inputs.data, filename, mode='delf')
+
+            if delf_feature is not None:
+                feature_maps.append(delf_feature)
+
+            #get global feature
+            # global_feature = self.__extract_global_feature__(inputs.data, os.path.join(input_path, 'jpg', filename[0]))
+            # if global_feature is not None:
+            #     global_feature_maps.append(global_feature)
+
+            # log.
+            batch_timer.update(time.time() - since)
+            since = time.time()
+            log_msg  = ('\n[Extract][Processing:({batch}/{size})] '+ \
+                        'eta: (data:{data:.3f}s),(batch:{bt:.3f}s),(total:{tt:})') \
+            .format(
+                batch=batch_idx + 1,
+                size=len(self.dataloader),
+                data=data_timer.val,
+                bt=batch_timer.val,
+                tt=bar.elapsed_td)
+            print(log_msg)
+            bar.next()
+
+            # free GPU cache every.
+            torch.cuda.empty_cache()
+            #print('GPU Memory flushed !!!!!!!!!')
+
+        # use pickle to save DeLF features.
+        self.__save_delf_features_to_file__(feature_maps, output_path +'.local')
+        print("Saved local feature to file ",  output_path +'.local')
+        # self.__save_delf_features_to_file__(global_feature_maps, output_path + '.global')
+        # print("Saved global feature to file ", output_path + '.global')
                 
 
 if __name__ == "__main__":
     MODE = 'delf'           # either "delf" or "pca"
-    GPU_ID = 7
+    GPU_ID = 1
     IOU_THRES = 0.98
     ATTN_THRES = 0.17
     TOP_K = 1000
@@ -376,7 +343,7 @@ if __name__ == "__main__":
     
     MODEL_NAME = 'ldmk'
     
-    LOAD_FROM = 'archive/model/{}/keypoint/ckpt/fix.pth.tar'.format(MODEL_NAME)
+    LOAD_FROM = '/home/ubuntu/DELG/train/repo/devel/finetune/ckpt/model.pth.par'
     PCA_PARAMETERS_PATH = 'archive/pca/{}/pca.h5'.format(MODEL_NAME)
 
     extractor_config = {
@@ -397,23 +364,12 @@ if __name__ == "__main__":
         'EXPR': EXPR,
         'TARGET_LAYER': TARGET_LAYER,
     }
-
     
     extractor = FeatureExtractor(extractor_config)
-    if MODE.lower() in ['pca']:
-        OUTPUT_PATH = 'dummy'
-        INPUT_PATH = 'your_path_to_dataset'
-        extractor.extract(INPUT_PATH, OUTPUT_PATH)
-    
-    elif MODE.lower() in ['delf']:
-        # query
-        INPUT_PATH = 'your_path_to_dataset'
-        OUTPUT_PATH = 'archive/delf.batch/{}/oxf5k_query.delf'.format(MODEL_NAME)
-        extractor.extract(INPUT_PATH, OUTPUT_PATH)
-        # index
-        INPUT_PATH = 'data/oxf5k/index'
-        OUTPUT_PATH = 'archive/delf.batch/{}/oxf5k_index.delf'.format(MODEL_NAME)
-        extractor.extract(INPUT_PATH, OUTPUT_PATH)
+
+    INPUT_PATH = '/data/test/oxford5k'
+    OUTPUT_PATH = 'roxf5k.delf'
+    extractor.extract(INPUT_PATH, OUTPUT_PATH)
 
 
 

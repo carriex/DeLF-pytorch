@@ -15,6 +15,7 @@ import torch
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 from torch.autograd import Variable
+from PIL import Image
 from concurrent.futures import ThreadPoolExecutor, as_completed     # for use of multi-threads
 
 __DEBUG__ = False
@@ -23,8 +24,8 @@ def GenerateCoordinates(h,w):
     '''generate coorinates
     Returns: [h*w, 2] FloatTensor
     '''
-    x = torch.floor(torch.arange(0, w*h) / w)
-    y = torch.arange(0, w).repeat(h)
+    x = torch.floor(torch.arange(0., w*h) / w)
+    y = torch.arange(0., w).repeat(h)
 
     coord = torch.stack([x,y], dim=1)
     return coord
@@ -96,6 +97,59 @@ def ApplyPcaAndWhitening(data,
     if use_whitening:
         output = output.div((pca_vars.narrow(0, 0, pca_dims) ** 0.5))
     return output
+
+
+def GetGlobalFeatureFromMultiScale(
+        x,
+        model,
+        filename,
+        scale_list,
+        workers=8):
+    '''GetDelfFeatureFromMultiScale
+    warning: use workers = 1 for serving otherwise out of memory error could occurs.
+    (because uwsgi uses multi-threads by itself.)
+    '''
+
+    def __concat_tensors_in_list__(tensor_list, dim):
+        res = None
+        tensor_list = [x for x in tensor_list if x is not None]
+        for tensor in tensor_list:
+            if res is None:
+                res = tensor
+            else:
+                res = torch.cat((res, tensor), dim=dim)
+        return res
+
+    # extract features for each scale, and concat.
+    output_features = torch.empty((1, 100000))
+    image = Image.open(filename)
+
+    # for scale in scale_list:
+    #     if output_features is None:
+    #         output_features = GetGlobalFeatureFromSingleScale(image, model, scale)
+    #     else:
+    #         output_features += GetGlobalFeatureFromSingleScale(image, model, scale)
+    #print("*********global feature: ", output_features.shape, "*********")
+    #output_features /= len(scale_list)
+    #output_features /= output_features.norm()
+    #output_features = __concat_tensors_in_list__(output_features, dim=0)
+
+    output_features = GetGlobalFeatureFromSingleScale(image, model, 1)
+
+    data = {
+        'filename': filename,
+        'global_features': output_features.cpu().detach().numpy(),
+    }
+
+    # free GPU memory.
+    del output_features
+    # torch.cuda.empty_cache()            # it releases all unoccupied cached memory!! (but it makes process slow)
+
+    if __DEBUG__:
+        # PrintGpuMemoryStats()
+        PrintResult(data)
+    return data
+
 
 def GetDelfFeatureFromMultiScale(
     x,
@@ -257,7 +311,7 @@ def GetDelfFeatureFromSingleScale(
     selected_original_scale_attn = None
     if scale == 1.0:
         selected_original_scale_attn = torch.clamp(scaled_scores*255, 0, 255) # 1 1 h w
-        
+
     # calculate receptive field boxes.
     rf_boxes = CalculateReceptiveBoxes(
         height=scaled_features.size(2),
@@ -265,21 +319,11 @@ def GetDelfFeatureFromSingleScale(
         rf=rf,
         stride=stride,
         padding=padding)
-    
+
     # re-projection back to original image space.
     rf_boxes = rf_boxes / scale
-    scaled_scores = scaled_scores.view(-1)
     scaled_features = scaled_features.view(scaled_features.size(1), -1).t()
-
-    # do post-processing for dimension reduction by PCA.
-    scaled_features = DelfFeaturePostProcessing(
-        rf_boxes, 
-        scaled_features,
-        pca_mean,
-        pca_vars,
-        pca_matrix,
-        pca_dims,
-        use_pca)
+    scaled_scores = scaled_scores.view(-1)
 
     # use attention score to select feature.
     indices = None
@@ -288,7 +332,7 @@ def GetDelfFeatureFromSingleScale(
         attn_thres = attn_thres * 0.5   # use lower threshold if no indexes are found.
         if attn_thres < 0.001:
             break;
-   
+
     try:
         selected_boxes = torch.index_select(rf_boxes, dim=0, index=indices)
         selected_features = torch.index_select(scaled_features, dim=0, index=indices)
@@ -301,8 +345,30 @@ def GetDelfFeatureFromSingleScale(
         selected_scales = None
         print(e)
         pass;
-        
+
     return selected_boxes, selected_features, selected_scales, selected_scores, selected_original_scale_attn
+
+
+def GetGlobalFeatureFromSingleScale(
+    x,
+    model,
+    scale):
+
+    # scale image then get features and attention.
+    # new_h = int(round(x.size(2)*scale))
+    # new_w = int(round(x.size(3)*scale))
+    # scaled_x = F.upsample(x, size=(new_h, new_w), mode='bilinear')
+    scaled_x = transforms.functional.resize(x, size=(256, 256))
+    scaled_x = transforms.functional.to_tensor(scaled_x)
+    scaled_x = scaled_x.unsqueeze(0)
+    #scaled_x =  torch.nn.functional.interpolate(scaled_x, scale_factor=scale, mode='bilinear', align_corners=False)
+    if torch.cuda.is_available():
+        scaled_x = scaled_x.cuda()
+    scaled_features = model.extract_global_feature(scaled_x)
+
+    scaled_features = scaled_features.view(scaled_features.size(1), -1).t()
+
+    return scaled_features.squeeze()
 
 
 def DelfFeaturePostProcessing(
