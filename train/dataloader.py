@@ -85,12 +85,8 @@ def get_loader(
                                    transform=train_transform)
     val_dataset = GoogleLandmark(data_dir='/data/google-landmark/org/train',
                                  data_csv='/data/google-landmark/csv/val-clean-1000.csv',
-<<<<<<< HEAD
-                                 transform=val_transform)
-=======
                                  transform=val_transform,
                                  idx_to_class=train_dataset.idx_to_class)
->>>>>>> add retrieval code
 
 
     # return train/val dataloader
