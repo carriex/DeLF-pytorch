@@ -53,10 +53,6 @@ def get_loader(
     workers):
 
     prepro = []
-<<<<<<< HEAD
-=======
-    print(sample_size)
->>>>>>> add retrieval code
     prepro.append(transforms.Resize(size=(sample_size,sample_size)))
     # prepro.append(transforms.CenterCrop(size=sample_size))
     # ------------random crop----------------#
